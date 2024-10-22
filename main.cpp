@@ -72,3 +72,12 @@ TEST(Vector_t, TestMoveConstructorAndAssignOperator) {
   ASSERT_EQ(moved2.size(), size);
   ASSERT_EQ(moved2.capacity(), capacity);
 }
+
+TEST(Vector_t, TestAccessMethods) {
+  vector_t vector{1, 2, 3, 4};
+  ASSERT_EQ(vector.front(), 1);
+  ASSERT_EQ(vector.back(), 4);
+
+  ASSERT_EQ(vector[0], 1);
+  ASSERT_EQ(vector.data(), &vector[0]);
+}
