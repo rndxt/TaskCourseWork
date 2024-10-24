@@ -109,7 +109,7 @@ public:
       return;
 
     vector_t<T> tmp(base{newCapacity});
-    std::move(buffer_, buffer_ + size_, tmp.buffer_);
+    std::move(begin(), end(), tmp.begin());
     tmp.size_ = size_;
     std::swap(*this, tmp);
   }
@@ -149,21 +149,18 @@ public:
   reference emplace_back(Args &&...args) {
     assert(size() <= capacity_);
     reserve(calcNewCapasity());
-    emplaceConstruct(buffer_ + size(), std::forward<Args>(args)...);
-    ++size();
+    emplaceConstruct(buffer_ + size_, std::forward<Args>(args)...);
+    ++size_;
     return back();
   }
 
   void push_back(const_reference value) {
     T tmp(value);
-    push_back(std::move(tmp));
+    emplace_back(std::move(tmp));
   }
 
   void push_back(T &&value) {
-    assert(size() <= capacity_);
-    reserve(calcNewCapasity());
-    buffer_[size()] = std::move(value);
-    ++size_;
+    emplace_back(std::move(value));
   }
 
   void pop_back() {
@@ -192,9 +189,7 @@ public:
 
   const_iterator erase(const_iterator pos) {
     auto i = std::distance(cbegin(), pos);
-    std::remove(cbegin(), cend(), pos);
-    pop_back();
-    return cbegin() + i;
+    return erase(std::next(begin(), i));
   }
 
 private:
@@ -205,11 +200,13 @@ private:
 
   vector_t(base &&buffer) : base(std::move(buffer)) {}
 
-  static void copyConstruct(T *ptr, const T &value) { new (ptr) T(value); }
-
   template <typename... Args>
   static void emplaceConstruct(T *ptr, Args &&...args) {
     new (ptr) T(std::forward<Args>(args)...);
+  }
+
+  static void copyConstruct(T *ptr, const T &value) {
+    emplaceConstruct(ptr, value);
   }
 
   static void defaultConstruct(T *ptr) { emplaceConstruct(ptr); }

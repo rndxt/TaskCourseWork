@@ -162,13 +162,19 @@ TEST(Vector_t, TestEmplace) {
   ASSERT_EQ(vector.front().getInt(), 1);
   ASSERT_EQ(vector.front().getDouble(), 2.0);
 
-  int x = 2;
   vector.emplace(vector.begin(), 2, 3.0);
   ASSERT_FALSE(vector.empty());
   ASSERT_EQ(vector.size(), 2);
   ASSERT_GE(vector.capacity(), 2);
   ASSERT_EQ(vector.front().getInt(), 2);
   ASSERT_EQ(vector.front().getDouble(), 3.0);
+
+  vector.emplace_back(3, 4.0);
+  ASSERT_FALSE(vector.empty());
+  ASSERT_EQ(vector.size(), 3);
+  ASSERT_GE(vector.capacity(), 3);
+  ASSERT_EQ(vector.back().getInt(), 3);
+  ASSERT_EQ(vector.back().getDouble(), 4.0);
 }
 
 TEST(Vector_t, TestErase) {
