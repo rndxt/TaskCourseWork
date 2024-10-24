@@ -10,7 +10,8 @@
 
 namespace task {
 
-template <typename T> class vector_t : public detail::buffer_t<T> {
+template <typename T>
+class vector_t : private detail::buffer_t<T> {
   static_assert(
       std::is_nothrow_move_constructible_v<T>,
       "This implementation works only for no_throw_constructible types");
@@ -23,29 +24,26 @@ public:
   using const_reference = const T &;
   using iterator = T *;
   using const_iterator = const T *;
-  using reverse_iterator = std::reverse_iterator<iterator>;
-  using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
 public:
   vector_t() noexcept {}
 
-  explicit vector_t(size_type count) noexcept(
-      std::is_nothrow_default_constructible_v<T>)
-      : base(count) {
-    while (size_ < count) {
+  explicit vector_t(size_type count) : base(count) {
+    while (size() < count) {
       defaultConstruct(buffer_ + size_);
       size_ += 1;
     }
   }
 
   vector_t(size_type count, const_reference value) : base(count) {
-    while (size_ < count) {
+    while (size() < count) {
       copyConstruct(buffer_ + size_, value);
       size_ += 1;
     }
   }
 
-  template <typename InputIt> vector_t(InputIt first, InputIt last) {
+  template <typename InputIt>
+  vector_t(InputIt first, InputIt last) {
     while (first != last) {
       push_back(*first++);
     }
@@ -55,7 +53,7 @@ public:
       : vector_t(list.begin(), list.end()) {}
 
   vector_t(const vector_t &other) : base(other.size_) {
-    while (size_ < other.size_) {
+    while (size() < other.size()) {
       copyConstruct(buffer_ + size_, other.buffer_[size_]);
       size_ += 1;
     }
@@ -110,10 +108,8 @@ public:
     if (newCapacity <= capacity_)
       return;
 
-    vector_t<T> tmp(newCapacity);
-    for (size_type i = 0; i != size_; ++i) {
-      tmp.buffer_[i] = std::move(buffer_[i]);
-    }
+    vector_t<T> tmp(base{newCapacity});
+    std::move(buffer_, buffer_ + size_, tmp.buffer_);
     tmp.size_ = size_;
     std::swap(*this, tmp);
   }
@@ -121,38 +117,41 @@ public:
 public:
   iterator insert(const_iterator pos, const_reference value) {
     T copy(value);
-    return insert(pos, std::move(value));
+    return insert(pos, std::move(copy));
   }
 
   iterator insert(const_iterator pos, T &&value) {
-    vector_t<T> tmp(calcNewCapasity());
-    auto countElementsBeforePos = std::distance(cbegin(), pos);
-    size_type i = 0;
-    for (; i < countElementsBeforePos; ++i) {
-      tmp.buffer_[i] = std::move(buffer_[i]);
+    iterator r;
+    iterator p = begin() + std::distance(cbegin(), pos);
+    if (size() < capacity()) {
+      size_ += 1;
+      std::move_backward(p, end(), end());
+      r = p;
+    } else {
+      vector_t<T> tmp;
+      tmp.reserve(calcNewCapasity());
+      tmp.size_ = size_ + 1;
+      r = std::move(begin(), p, tmp.begin());
+      std::move_backward(p, end(), tmp.end());
+      std::swap(*this, tmp);
     }
-
-    tmp.buffer_[i] = std::move(value);
-    ++i;
-
-    for (; i < tmp.size_; ++i) {
-      tmp.buffer_[i] = std::move(buffer_[i]);
-    }
-    return begin() + countElementsBeforePos;
+    *r = std::move(value);
+    return r;
   }
 
   template <typename... Args>
-  iterator emplace(const_reference pos, Args &&...args) {
+  iterator emplace(const_iterator pos, Args &&...args) {
     T value(std::forward<Args>(args)...);
     return insert(pos, std::move(value));
   }
 
-  template <typename... Args> reference emplace_back(Args &&...args) {
-    assert(size_ <= capacity_);
+  template <typename... Args>
+  reference emplace_back(Args &&...args) {
+    assert(size() <= capacity_);
     reserve(calcNewCapasity());
-    emplaceConstruct(buffer_ + size_, std::forward<Args>(args)...);
-    ++size_;
-    return buffer_[size_ - 1];
+    emplaceConstruct(buffer_ + size(), std::forward<Args>(args)...);
+    ++size();
+    return back();
   }
 
   void push_back(const_reference value) {
@@ -161,34 +160,36 @@ public:
   }
 
   void push_back(T &&value) {
-    assert(size_ <= capacity_);
+    assert(size() <= capacity_);
     reserve(calcNewCapasity());
-    buffer_[size_] = std::move(value);
+    buffer_[size()] = std::move(value);
     ++size_;
   }
 
   void pop_back() {
-    assert(size_ > 0);
+    assert(!empty());
     size_ -= 1;
     detail::destroy(buffer_ + size_);
   }
 
   void resize(size_type count) {
-    while (size_ < count) {
+    while (size() < count) {
       emplace_back();
     }
 
-    while (size_ > count) {
+    while (size() > count) {
       pop_back();
     }
   }
 
   iterator erase(iterator pos) {
+    assert(pos != end());
     auto i = std::distance(begin(), pos);
-    std::remove(begin(), end(), pos);
+    std::rotate(pos, std::next(pos), end());
     pop_back();
     return begin() + i;
   }
+
   const_iterator erase(const_iterator pos) {
     auto i = std::distance(cbegin(), pos);
     std::remove(cbegin(), cend(), pos);
@@ -201,6 +202,8 @@ private:
   using base::buffer_;
   using base::capacity_;
   using base::size_;
+
+  vector_t(base &&buffer) : base(std::move(buffer)) {}
 
   static void copyConstruct(T *ptr, const T &value) { new (ptr) T(value); }
 
@@ -215,7 +218,7 @@ private:
     if (capacity_ == 0)
       return 1;
 
-    if (size_ == capacity_)
+    if (size() == capacity_)
       return 2 * capacity_;
 
     return capacity_;
