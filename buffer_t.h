@@ -8,21 +8,25 @@ namespace task {
 namespace detail {
 
 template <typename T>
-void destroy(T *ptr) { ptr->~T(); }
+void destroy(T *ptr) {
+  ptr->~T();
+}
 
-template <typename ForwardIt> void destroy(ForwardIt begin, ForwardIt end) {
+template <typename ForwardIt>
+void destroy(ForwardIt begin, ForwardIt end) {
   while (begin != end) {
     destroy(&*begin++);
   }
 }
 
-template <typename T> class buffer_t {
+template <typename T>
+class buffer_t {
 protected:
   T *buffer_ = nullptr;
   std::size_t size_ = 0;
   std::size_t capacity_ = 0;
 
-protected:
+public:
   buffer_t() = default;
 
   buffer_t(std::size_t count)
