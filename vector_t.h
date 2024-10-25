@@ -128,6 +128,7 @@ public:
       std::move_backward(p, end(), end());
       r = p;
     } else {
+      assert(size() == capacity());
       vector_t<T> tmp;
       tmp.reserve(calcNewCapasity());
       tmp.size_ = size_ + 1;
@@ -147,7 +148,7 @@ public:
 
   template <typename... Args>
   reference emplace_back(Args &&...args) {
-    assert(size() <= capacity_);
+    assert(size() <= capacity());
     reserve(calcNewCapasity());
     emplaceConstruct(buffer_ + size_, std::forward<Args>(args)...);
     ++size_;
@@ -202,6 +203,7 @@ private:
 
   template <typename... Args>
   static void emplaceConstruct(T *ptr, Args &&...args) {
+    assert(ptr != nullptr);
     new (ptr) T(std::forward<Args>(args)...);
   }
 
@@ -222,7 +224,7 @@ private:
   }
 };
 
-template <class InputIt>
+template <typename InputIt>
 vector_t(InputIt first, InputIt last)
     -> vector_t<typename std::iterator_traits<InputIt>::value_type>;
 
